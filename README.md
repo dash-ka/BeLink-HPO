@@ -104,7 +104,7 @@ The re-ranker needs candidates. This package includes the dense retriever used t
 Build the index once (see [docs/TRAINING.md](docs/TRAINING.md#1-hpo-name-index) for the input file):
 
 ```bash
-belink-hpo embed-terms --ontology hpo_terminology.json.gz --out_vectors index/hpo_vec.npy
+belink-hpo embed-terms --ontology index/terminology.json.gz --out_vectors index/hpo_vec.npy
 ```
 
 Then link mentions:

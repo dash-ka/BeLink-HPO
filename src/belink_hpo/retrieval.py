@@ -2,7 +2,7 @@
 
 Build the index once:
 
-    belink-hpo embed-terms --ontology hpo_terminology.json.gz --out_vectors index/hpo_vec.npy
+    belink-hpo embed-terms --ontology index/terminology.json.gz --out_vectors index/hpo_vec.npy
 
 Then retrieve candidates in Python:
 

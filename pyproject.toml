@@ -23,7 +23,7 @@ dependencies = [
 # fine-tuning and dataset upload
 train = ["datasets", "bitsandbytes", "huggingface_hub"]
 # rebuilding the HPO training data from the raw corpora
-data = ["pronto", "spacy", "datasets", "huggingface_hub"]
+data = ["pronto", "spacy", "datasets", "huggingface_hub", "requests"]
 # LLM-generated standard names used as retrieval feedback
 expand = ["openai"]
 dev = ["pytest"]

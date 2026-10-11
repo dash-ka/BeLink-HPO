@@ -16,16 +16,22 @@ python -m spacy download en_core_web_sm
 
 Every HPO name and synonym is embedded with SapBERT.
 
-The input is `hpo_terminology.json.gz`: a gzipped JSON list with one `{"id": "hp:0001156", "name": "short fingers or toes (brachydactyly)"}` record per name. It is produced from `hp.obo`:
+First, `hp.obo` is turned into a flat list of names:
 
 ```bash
-python scripts/prepare_obo.py --ontology_path hp.obo --output_dir .
+python scripts/prepare_obo.py --ontology_path hp.obo --output_dir index
 ```
 
-From the HPO release used here this gave 19,894 terms (obsolete terms excluded) and 45,176 names, 2.27 per term.
+This writes `index/terminology.json.gz`, a gzipped JSON list with one `{"id": "hp:0001156", "name": "short fingers or toes (brachydactyly)"}` record per name. Each synonym is written as `synonym (preferred name)` and each preferred name as `preferred name (longest synonym)`, so that no two terms share a name. Obsolete terms and the root term `All` are skipped. The file must be called `hp.obo`, because the script takes the ontology prefix from the file name.
+
+From the HPO release used here this gave 19,894 terms and 45,176 names, 2.27 per term.
+
+The index behind the released model was built before the root term was excluded, so it also contained `All` (HP:0000001). An index rebuilt with the current script differs from it only by that term.
+
+Then the names are embedded:
 
 ```bash
-belink-hpo embed-terms --ontology hpo_terminology.json.gz \
+belink-hpo embed-terms --ontology index/terminology.json.gz \
     --model_name cambridgeltl/SapBERT-from-PubMedBERT-fulltext \
     --out_vectors index/hpo_vec.npy
 ```
@@ -163,7 +169,7 @@ One JSON object per line ([`examples/examples.jsonl`](../examples/examples.jsonl
 | `candidates` | Retrieved names, best first. A concept may appear several times under different names. Ids must be written the same way as `gold_id` |
 | `doc_id` | Optional. Examples that share it stay on the same side of the train/test split |
 
-Use the retriever you will use in production to produce the candidates, so that the model trains on the mistakes it will have to correct. To use the one in this package, build an index of your ontology's names (step 1 above) and call `CandidateRetriever.retrieve`. Retrieve more names than you will show (30 here), which gives the sampler a pool of negatives.
+Use the retriever you will use in production to produce the candidates, so that the model trains on the mistakes it will have to correct. To use the one in this package, build an index of your ontology's names (`prepare_obo.py` and `embed-terms`, as in step 1 above; any OBO file works) and call `CandidateRetriever.retrieve`. Retrieve more names than you will show (30 here), which gives the sampler a pool of negatives.
 
 ### 2. Build the prompts
 
