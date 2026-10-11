@@ -89,6 +89,18 @@ reranker = HPOReranker.from_pretrained(preferred_names=preferred)
 
 Candidate ids must match the keys of that mapping (`HP:0001156`, upper case).
 
+Without `preferred_names`, candidate names are shown exactly as you give them. The model still works, but it was trained on the `(aka ...)` form, so prompts without it differ from what it saw in training.
+
+Which commands use preferred names depends on who writes the prompt:
+
+| Command or function | Who writes the prompt | Preferred names |
+|---|---|---|
+| `rerank`, `rerank_batch`, `belink-hpo rerank`, `HPOLinker` | The package, from your candidates | Only if you pass `preferred_names` / `--preferred-names` |
+| `belink-hpo build-dataset`, `prepare_train`, `prepare_test` | The package, from your examples | Only if you pass `--preferred-names` / `preferred_names` |
+| `predict_labels`, `belink-hpo predict` | You, beforehand | Not applied: prompts are scored exactly as written |
+
+`predict` is meant for files of ready-made prompts, such as the `test.jsonl` written by `build-dataset`. If that file was built with preferred names, they are already in the option text.
+
 ### From the command line
 
 ```bash
@@ -149,6 +161,38 @@ belink-hpo predict --file data/test.jsonl --adapter my-reranker
 | `belink-hpo retrieve` | Retrieve candidates for a JSON file of mentions |
 
 Run any command with `--help` for its options.
+
+### `predict` or `rerank`?
+
+Both run the same model with the same scoring. They differ in what you give them and what you get back.
+
+| | `predict` | `rerank` |
+|---|---|---|
+| Input | Ready-made prompts in the messages format | Context, mention and a candidate list |
+| Builds the prompt | No, scores the text as written | Yes: one name per concept, at most 10, optional `(aka ...)` |
+| Output | An option letter, e.g. `B` | An HPO id, e.g. `HP:0001156`, or none |
+| Letters compared | All 26 | Only the ones offered in the prompt |
+| Accuracy measured against | The gold letter in the file | `gold_id`, if present |
+| Use it for | Evaluating a model on a test set | Linking mentions |
+
+**`predict` is the evaluation tool.** It reads a file such as the `test.jsonl` written by `build-dataset` and reports how often the model picks the right letter. Because the prompts are fixed in the file, two models scored on it are compared on exactly the same inputs.
+
+**`rerank` is the tool for actual use.** It writes the prompt from your candidates, runs the model, and translates the chosen letter back into an HPO id. The id is empty when the model answers "None of the above".
+
+In Python the same split is `reranker.predict_labels(prompts)`, which returns letters, and `reranker.rerank(context, mention, candidates)`, which returns a result with `.id`.
+
+**Which letters can win.** The model scores every letter from A to Z on each prompt, even when the prompt offers only a few. Take a prompt with three candidates:
+
+```
+A: short toe
+B: short fingers or toes (aka brachydactyly)
+C: type a brachydactyly
+D: None of the above.
+```
+
+Only A to D mean anything here. `predict` receives just the prompt text and has no record of how many options it holds, so it takes the highest score among all 26 letters. If that were `E`, the answer would be meaningless and counted as wrong. `rerank` built the prompt itself, so it compares A to D only and reports its confidence over those four. A fine-tuned model has learned to answer with a listed letter, so the two rarely differ.
+
+On the same mentions, `predict` and `rerank` therefore give the same answers, provided `rerank` is given the preferred names that were used to build the prompts in the file.
 
 ## Development
 
