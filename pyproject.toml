@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "belink-hpo"
+version = "0.1.0"
+description = "LLM re-ranker for linking phenotype mentions to Human Phenotype Ontology (HPO) terms"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Darya Shlyk" }]
+keywords = ["HPO", "entity linking", "biomedical NLP", "re-ranking", "LoRA", "Qwen3"]
+dependencies = [
+    "torch",
+    "transformers>=4.51",   # first release with Qwen3 support
+    "peft>=0.14",
+    "accelerate",
+    "numpy",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+# fine-tuning and dataset upload
+train = ["datasets", "bitsandbytes", "huggingface_hub"]
+# rebuilding the HPO training data from the raw corpora
+data = ["pronto", "spacy", "datasets", "huggingface_hub"]
+# LLM-generated standard names used as retrieval feedback
+expand = ["openai"]
+dev = ["pytest"]
+
+[project.urls]
+Homepage = "https://github.com/dash-ka/BeLink-HPO"
+Model = "https://huggingface.co/Dash00/qwen3-4b-lora-hpo-reranker"
+
+[project.scripts]
+belink-hpo = "belink_hpo.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

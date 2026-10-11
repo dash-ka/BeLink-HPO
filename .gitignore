@@ -1,0 +1,19 @@
+__pycache__/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+
+# secrets
+.env
+
+# data, indexes and model outputs
+data/
+index/
+*.npy
+hp.obo
+qwen3-mcq-lora/
+predictions.jsonl
+linked.jsonl
