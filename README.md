@@ -113,9 +113,10 @@ belink-hpo rerank --input mentions.jsonl --out linked.jsonl --preferred-names hp
 
 The re-ranker needs candidates. This package includes the dense retriever used to build the training data: [SapBERT](https://huggingface.co/cambridgeltl/SapBERT-from-PubMedBERT-fulltext) embeddings of every HPO name and synonym, searched by inner product.
 
-Build the index once (see [docs/TRAINING.md](docs/TRAINING.md#1-hpo-name-index) for the input file):
+Build the index once (details in [docs/TRAINING.md](docs/TRAINING.md#1-hpo-name-index)):
 
 ```bash
+belink-hpo prepare-obo --ontology_path hp.obo --output_dir index
 belink-hpo embed-terms --ontology index/terminology.json.gz --out_vectors index/hpo_vec.npy
 ```
 
@@ -157,6 +158,7 @@ belink-hpo predict --file data/test.jsonl --adapter my-reranker
 | `belink-hpo predict` | Predict option letters for a file of ready-made prompts, and report accuracy |
 | `belink-hpo train` | Fine-tune a LoRA adapter |
 | `belink-hpo build-dataset` | Turn examples with candidates into training and test prompts |
+| `belink-hpo prepare-obo` | Turn an OBO ontology into the list of names to index |
 | `belink-hpo embed-terms` | Embed ontology names into a retrieval index |
 | `belink-hpo retrieve` | Retrieve candidates for a JSON file of mentions |
 

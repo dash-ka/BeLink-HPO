@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Turn an OBO ontology into the list of names that the retrieval index is built from.
 
-    python scripts/prepare_obo.py --ontology_path hp.obo --output_dir index
+    belink-hpo prepare-obo --ontology_path hp.obo --output_dir index
 
 Writes to the output directory:
     terminology.json.gz    [{"id": "hp:0001156", "name": "short fingers or toes (brachydactyly)"}, ...]
@@ -12,9 +12,9 @@ Writes to the output directory:
 
 Every synonym is written as "synonym (preferred name)" and every preferred name as
 "preferred name (longest synonym)", so that no two concepts share a name. Obsolete terms
-and the root term "All" are skipped. The file name must be the ontology prefix (hp.obo): terms whose id does not
-contain it are treated as external and skipped. If the file does not exist it is
-downloaded from purl.obolibrary.org.
+and the root term "All" are skipped. The file name must be the ontology prefix (hp.obo):
+terms whose id does not contain it are treated as external and skipped. If the file does
+not exist it is downloaded from purl.obolibrary.org.
 """
 
 import argparse, re, json, gzip
@@ -163,7 +163,10 @@ def load_obo(path_to_obo_file, cache_obo=True):
     
         print(f"File not found locally. Fetching from URL: {url}")
         
-        import requests
+        try:
+            import requests
+        except ImportError:
+            raise SystemExit(f"{path} not found. Download it, or run 'pip install requests' to fetch it automatically.")
 
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers)
@@ -292,8 +295,8 @@ def resolve_homonyms(name2cui: list, kb: dict, alt_ids2cui: dict) -> dict:
     return disambiguated_aliases, alt_ids2cui, statistics
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="Inject obo ontology from URL or local file")
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(prog="belink-hpo prepare-obo", description="Turn an OBO ontology into the list of names for the retrieval index")
     parser.add_argument("--ontology_path", type=str, required=True,
                         help="Path to .obo file (e.g., ../datasets/ncbitaxon.obo) or a URL")
     parser.add_argument("--output_dir", type=str,
@@ -302,11 +305,11 @@ def parse_args():
     parser.add_argument("--cache_obo", action="store_true", 
                         help="Whether to save .obo to disk after download. Default: False.")
     
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
     filepath = args.ontology_path
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

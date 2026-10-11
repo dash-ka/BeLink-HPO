@@ -101,3 +101,25 @@ def test_linker_passes_retrieved_candidates_to_the_reranker():
     assert calls["rerank"] == [{"context": "ctx", "mention": "short toe", "candidates": [{"id": "HP:1", "name": "short toe"}]}]
     linker.link("ctx", "short toe", standard_name="Short toe")
     assert calls["retrieve"][1] == ["Short toe"]
+
+
+def test_prepare_obo_command(tmp_path):
+    import gzip
+    import json
+
+    from belink_hpo import cli
+
+    (tmp_path / "hp.obo").write_text(
+        "format-version: 1.2\n\n"
+        "[Term]\nid: HP:0000001\nname: All\n\n"
+        "[Term]\nid: HP:0001831\nname: Short toe\nsynonym: \"Stubby toes\" EXACT layperson []\n\n"
+        "[Term]\nid: HP:0000002\nname: Old thing\nis_obsolete: true\n",
+        encoding="utf-8",
+    )
+    cli.main(["prepare-obo", "--ontology_path", str(tmp_path / "hp.obo"), "--output_dir", str(tmp_path / "index")])
+    with gzip.open(tmp_path / "index" / "terminology.json.gz", "rt", encoding="utf-8") as f:
+        names = json.load(f)
+    assert names == [
+        {"id": "hp:0001831", "name": "short toe (stubby toes)"},
+        {"id": "hp:0001831", "name": "stubby toes (short toe)"},
+    ]

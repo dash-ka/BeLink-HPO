@@ -14,6 +14,7 @@ COMMANDS = {
     "predict": ("belink_hpo.predict:main", "Predict option letters for a JSONL file in the messages format"),
     "train": ("belink_hpo.train:main", "Fine-tune a LoRA adapter on a messages-format dataset"),
     "build-dataset": ("belink_hpo.dataset:main", "Turn examples with candidates into train/test JSONL"),
+    "prepare-obo": ("belink_hpo.prepare_obo:main", "Turn an OBO ontology into the list of names to index"),
     "embed-terms": ("belink_hpo.retrieval:embed_terms_main", "Embed ontology names into a retrieval index"),
     "retrieve": ("belink_hpo.retrieval:retrieve_main", "Retrieve candidates for a JSON file of mentions"),
 }
