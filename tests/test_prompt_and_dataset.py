@@ -123,3 +123,5 @@ def test_prepare_obo_command(tmp_path):
         {"id": "hp:0001831", "name": "short toe (stubby toes)"},
         {"id": "hp:0001831", "name": "stubby toes (short toe)"},
     ]
+    preferred = json.loads((tmp_path / "index" / "preferred_names.json").read_text(encoding="utf-8"))
+    assert preferred == {"HP:0001831": "Short toe"}

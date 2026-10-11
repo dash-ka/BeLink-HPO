@@ -226,15 +226,16 @@ def main(argv=None):
     p.add_argument("--test-fraction", type=float, default=0.1, help="Share of documents held out for testing")
     p.add_argument("--epochs", type=int, default=5, help="Passes over the data, each with freshly sampled options")
     p.add_argument("--nota-rate", type=float, default=0.0, help="Share of rows where the gold concept is hidden")
-    p.add_argument("--preferred-names", default=None, help="JSON file mapping concept id -> preferred name")
+    p.add_argument("--preferred-names", default=None, help="JSON file mapping concept id -> preferred name, or an .obo file")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--push-to", default=None, help="Hub dataset id to upload to, e.g. username/my-dataset")
     args = p.parse_args(argv)
 
     preferred = None
     if args.preferred_names:
-        with open(args.preferred_names, encoding="utf-8") as f:
-            preferred = json.load(f)
+        from .ontology import load_preferred_names
+
+        preferred = load_preferred_names(args.preferred_names)
 
     examples = load_jsonl(args.input)
     if args.test_input:

@@ -8,7 +8,7 @@ class HPOLinker:
 
         linker = HPOLinker(
             CandidateRetriever.from_files("index/hpo_vec.npy", "index/ontology_mapping.txt"),
-            HPOReranker.from_pretrained(preferred_names=load_preferred_names("hp.obo")),
+            HPOReranker.from_pretrained(preferred_names=load_preferred_names("index/preferred_names.json")),
         )
         linker.link("Hands show marked brachydactyly.", "brachydactyly").id
     """

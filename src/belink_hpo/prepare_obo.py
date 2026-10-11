@@ -8,6 +8,8 @@ Writes to the output directory:
                            one record per name; this is the input of `belink-hpo embed-terms`
     processed_obo.json.gz  the parsed terms (name, definition, synonyms, parents, alternate ids)
     alt_ids2cui.json       alternate id -> primary id
+    preferred_names.json   {"HP:0001156": "Brachydactyly", ...}; pass it as preferred names to the
+                           re-ranker and to `belink-hpo build-dataset`
     statistics_kb.json     counts
 
 Every synonym is written as "synonym (preferred name)" and every preferred name as
@@ -340,6 +342,13 @@ def main(argv=None):
     
     with open(output_dir / "statistics_kb.json", "w") as file:
         json.dump(statistics, file, indent=4)
+
+    # id -> preferred name, with upper-case ids ("HP:0001156") as the retriever and re-ranker use them
+    preferred_names = {cui.upper(): entry["name"] for cui, entry in onto.items() if cui not in excluded_cuis}
+    with open(output_dir / "preferred_names.json", "w", encoding="utf-8") as file:
+        json.dump(preferred_names, file, ensure_ascii=False)
+
+    print(f"Wrote terminology.json.gz and preferred_names.json to {output_dir}")
 
 if __name__ == "__main__":
     main()

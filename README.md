@@ -83,11 +83,11 @@ In the training data each candidate name was followed by the term's preferred HP
 from belink_hpo import HPOReranker
 from belink_hpo.ontology import load_preferred_names
 
-preferred = load_preferred_names("hp.obo")          # needs the [data] extra; {"HP:0001156": "Brachydactyly", ...}
+preferred = load_preferred_names("index/preferred_names.json")   # {"HP:0001156": "Brachydactyly", ...}
 reranker = HPOReranker.from_pretrained(preferred_names=preferred)
 ```
 
-Candidate ids must match the keys of that mapping (`HP:0001156`, upper case).
+`index/preferred_names.json` is written by `belink-hpo prepare-obo --ontology_path hp.obo --output_dir index`. An `.obo` file can be passed in its place, which needs `pronto` (the `[data]` extra). Candidate ids must match the keys of the mapping (`HP:0001156`, upper case).
 
 Without `preferred_names`, candidate names are shown exactly as you give them. The model still works, but it was trained on the `(aka ...)` form, so prompts without it differ from what it saw in training.
 
@@ -104,7 +104,7 @@ Which commands use preferred names depends on who writes the prompt:
 ### From the command line
 
 ```bash
-belink-hpo rerank --input mentions.jsonl --out linked.jsonl --preferred-names hp.obo
+belink-hpo rerank --input mentions.jsonl --out linked.jsonl --preferred-names index/preferred_names.json
 ```
 
 `mentions.jsonl` has one JSON object per line with `context`, `mention` and `candidates` (see [`examples/examples.jsonl`](examples/examples.jsonl)). If a line also has `gold_id`, accuracy is printed.
@@ -128,7 +128,7 @@ from belink_hpo.ontology import load_preferred_names
 
 linker = HPOLinker(
     CandidateRetriever.from_files("index/hpo_vec.npy", "index/ontology_mapping.txt"),
-    HPOReranker.from_pretrained(preferred_names=load_preferred_names("hp.obo")),
+    HPOReranker.from_pretrained(preferred_names=load_preferred_names("index/preferred_names.json")),
 )
 
 result = linker.link(

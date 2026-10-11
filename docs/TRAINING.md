@@ -28,7 +28,7 @@ First, `hp.obo` is turned into a flat list of names:
 belink-hpo prepare-obo --ontology_path hp.obo --output_dir index
 ```
 
-This writes `index/terminology.json.gz`, a gzipped JSON list with one `{"id": "hp:0001156", "name": "short fingers or toes (brachydactyly)"}` record per name. Each synonym is written as `synonym (preferred name)` and each preferred name as `preferred name (longest synonym)`, so that no two terms share a name. Obsolete terms and the root term `All` are skipped. The file must be called `hp.obo`, because the command takes the ontology prefix from the file name.
+This writes two files that later steps use. `index/preferred_names.json` maps each id to its preferred name (`{"HP:0001156": "Brachydactyly", ...}`) and is what the re-ranker and `build-dataset` take as preferred names. `index/terminology.json.gz` is a gzipped JSON list with one `{"id": "hp:0001156", "name": "short fingers or toes (brachydactyly)"}` record per name. Each synonym is written as `synonym (preferred name)` and each preferred name as `preferred name (longest synonym)`, so that no two terms share a name. Obsolete terms and the root term `All` are skipped. The file must be called `hp.obo`, because the command takes the ontology prefix from the file name.
 
 From the HPO release used here this gave 19,894 terms and 45,176 names, 2.27 per term.
 
@@ -181,12 +181,12 @@ Use the retriever you will use in production to produce the candidates, so that 
 
 ```bash
 belink-hpo build-dataset --input my_examples.jsonl --out-dir data \
-    --test-fraction 0.1 --epochs 5 --preferred-names preferred_names.json
+    --test-fraction 0.1 --epochs 5 --preferred-names index/preferred_names.json
 ```
 
 - `--test-fraction` holds out that share of documents. Use `--test-input other.jsonl` instead if you have a separate test set.
 - `--epochs` is the number of option sets sampled per mention.
-- `--preferred-names` (optional) is a JSON file mapping concept id to preferred name, used to add `(aka ...)` to the candidate names. `OntoReader("my.obo").save_preferred_names("preferred_names.json")` writes one from an OBO file.
+- `--preferred-names` (optional) is a JSON file mapping concept id to preferred name, used to add `(aka ...)` to the candidate names. `belink-hpo prepare-obo` writes one as `preferred_names.json`. Its ids are upper case, so write your `gold_id` and candidate ids the same way.
 - `--nota-rate 0.1` hides the gold concept in 10% of rows, to teach the model to answer `None of the above.` more readily.
 - `--push-to username/my-dataset` uploads the result to the Hugging Face Hub.
 
