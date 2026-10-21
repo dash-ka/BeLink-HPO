@@ -28,16 +28,16 @@ Linking accuracy on the BioCreative development set (607 mentions), with a re-ra
 
 The released adapter was then re-trained on both corpora, so it has no held-out score of its own.
 
-## Evaluation: phenotype recognition with OntoGPT + BeLink
+## Evaluation: phenotype recognition with OntoGPT and BeLink
 
-BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and linked the mentions it could not ground with BeLink, then compared the pipeline with three established HPO concept recognisers on the same corpus.
+BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and grounded them with BeLink in two ways: only the mentions OntoGPT could not ground itself (*fill*), or every mention (*all*). Both pipelines were compared with three established HPO concept recognisers on the same corpus.
 
 ### Setup
 
 - **Corpus:** BioCreative VIII Track 3 development set (`Clinical-Genetics-Physical-Exam-Data-Dev.tsv`): 454 physical-examination observations with 685 HPO annotations, 78 of them negated.
 - **Negated annotations** (e.g. *"Normal lips"* annotated with *Abnormal lip morphology*) are removed from the gold standard, leaving 607 mentions. Systems are not asked to classify mentions as present or negated; every prediction is scored.
-- **Scope:** all systems are restricted to the *Phenotypic abnormality* branch of HPO (HP:0000118), the scope of the gold standard. FastHPOCR and PhenoTagger are restricted by construction. For NCBO and OntoGPT, predictions outside the branch (mostly clinical modifiers such as *mild* or *bilateral*) are removed: 197 for NCBO and 2 for OntoGPT + BeLink.
-- **[BeLink model](https://huggingface.co/Dash00/qwen3-4b-lora-hpo-gsc-reranker):** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training.
+- **Scope:** all systems are restricted to the *Phenotypic abnormality* branch of HPO (HP:0000118), the scope of the gold standard. FastHPOCR and PhenoTagger are restricted by construction. For NCBO and OntoGPT, predictions outside the branch (mostly clinical modifiers such as *mild* or *bilateral*) are removed: 197 for NCBO and 2 for each BeLink pipeline.
+- **BeLink model:** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training.
 
 ### Systems
 
@@ -47,7 +47,8 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 | [PhenoTagger](https://github.com/ncbi-nlp/PhenoTagger) v1.2 | Hybrid dictionary and deep-learning tagger (Bioformer model, threshold 0.95, longest-match off). Its NegBio negation step is not used. |
 | [NCBO Annotator](https://bioportal.bioontology.org/annotator) | BioPortal's dictionary-based annotation web service, run with the HP ontology. |
 | [OntoGPT](https://github.com/monarch-initiative/ontogpt) | LLM extraction with SPIRES (`gpt-oss-120b`, temperature 0) using a template that quotes every phenotype mention and names it as a short HPO-style term. Grounded by OntoGPT's own lookup of HPO labels and synonyms. |
-| **OntoGPT + BeLink** | The same OntoGPT extractions. Mentions OntoGPT could not ground are linked by BeLink (SapBERT retrieval + re-ranking); OntoGPT's own HPO ids are kept for the rest. |
+| ontogpt+belink (fill) | The same OntoGPT extractions. Mentions OntoGPT could not ground are linked by BeLink (SapBERT retrieval + re-ranking); OntoGPT's own HPO ids are kept for the rest. |
+| **ontogpt+belink (all)** | The same OntoGPT extractions, all linked by BeLink; OntoGPT's own ids are not used. A mention BeLink declines (*None of the above*) stays ungrounded. |
 
 ### Metrics
 
@@ -66,7 +67,8 @@ Best values in bold.
 | PhenoTagger | 424 | 300 | 180 | 0.586 | 0.702 | 0.639 |
 | NCBO Annotator | 277 | **123** | 327 | 0.693 | 0.459 | 0.552 |
 | OntoGPT | 323 | 329 | 281 | 0.495 | 0.535 | 0.514 |
-| **OntoGPT + BeLink** | **450** | 196 | **154** | **0.697** | **0.745** | **0.720** |
+| ontogpt+belink (fill) | 450 | 196 | 154 | 0.697 | 0.745 | 0.720 |
+| **ontogpt+belink (all)** | **461** | 180 | **143** | **0.719** | **0.763** | **0.741** |
 
 **Mention level, overlapping boundaries**
 
@@ -74,9 +76,10 @@ Best values in bold.
 |---|---:|---:|---:|---:|---:|---:|
 | FastHPOCR | 369 | 353 | 238 | 0.511 | 0.608 | 0.555 |
 | PhenoTagger | 424 | 318 | 183 | 0.571 | 0.699 | 0.629 |
-| NCBO Annotator | 278 | **132** | 329 | **0.678** | 0.458 | 0.547 |
+| NCBO Annotator | 278 | **132** | 329 | 0.678 | 0.458 | 0.547 |
 | OntoGPT | 317 | 340 | 290 | 0.482 | 0.522 | 0.502 |
-| **OntoGPT + BeLink** | **442** | 211 | **165** | 0.677 | **0.728** | **0.702** |
+| ontogpt+belink (fill) | 442 | 211 | 165 | 0.677 | 0.728 | 0.702 |
+| **ontogpt+belink (all)** | **453** | 194 | **154** | **0.700** | **0.746** | **0.722** |
 
 **Mention level, exact boundaries**
 
@@ -86,22 +89,26 @@ Best values in bold.
 | PhenoTagger | **380** | 362 | **227** | 0.512 | **0.626** | **0.563** |
 | NCBO Annotator | 260 | **150** | 347 | **0.634** | 0.428 | 0.511 |
 | OntoGPT | 220 | 437 | 387 | 0.335 | 0.362 | 0.348 |
-| OntoGPT + BeLink | 299 | 354 | 308 | 0.458 | 0.493 | 0.475 |
+| ontogpt+belink (fill) | 299 | 354 | 308 | 0.458 | 0.493 | 0.475 |
+| ontogpt+belink (all) | 316 | 331 | 291 | 0.488 | 0.521 | 0.504 |
 
 **Effect of grounding with BeLink** (same extracted mentions)
 
-| | OntoGPT | OntoGPT + BeLink | Change |
-|---|---:|---:|---:|
-| Mentions with an HPO id | 398 / 662 (60.1%) | 595 / 662 (89.9%) | +197 |
-| Document-level F1 | 0.514 | 0.720 | +0.206 |
-| Mention-level F1, overlap | 0.502 | 0.702 | +0.200 |
-| Mention-level F1, exact | 0.348 | 0.475 | +0.127 |
+| | OntoGPT | ontogpt+belink (fill) | ontogpt+belink (all) | Change (fill) | Change (all) |
+|---|---:|---:|---:|---:|---:|
+| Mentions with an HPO id | 398 / 662 (60.1%) | 595 / 662 (89.9%) | 588 / 662 (88.8%) | +197 | +190 |
+| Document-level precision | 0.495 | 0.697 | 0.719 | +0.201 | +0.224 |
+| Document-level recall | 0.535 | 0.745 | 0.763 | +0.210 | +0.228 |
+| Document-level F1 | 0.514 | 0.720 | 0.741 | +0.206 | +0.226 |
+| Mention-level F1, overlap | 0.502 | 0.702 | 0.722 | +0.200 | +0.221 |
+| Mention-level F1, exact | 0.348 | 0.475 | 0.504 | +0.127 | +0.156 |
 
 ### Findings
 
-- **OntoGPT + BeLink recognises the most phenotypes.** It has the highest F1 at document level (0.720) and at mention level with overlapping boundaries (0.702), +0.08 and +0.07 over the strongest baseline, PhenoTagger. It also has the highest recall, with precision matching NCBO's.
-- **Grounding was OntoGPT's bottleneck.** OntoGPT on its own grounds only 60% of its mentions, because its lookup needs the HPO wording exactly ("posteriorly rotated ear" fails where "posteriorly rotated ears" succeeds), and it scores lowest. Linking the remaining mentions with BeLink raises F1 by about 0.20 at every level.
-- **Exact boundaries favour the dictionary tools.** With exact boundaries, PhenoTagger leads (0.563). About a third of OntoGPT's correctly located mentions do not match the gold boundaries exactly, against 6–10% for the baselines. The LLM quotes the clinical phrase as written, including degree and laterality words (*"Mildly high arched palate"*), whereas the annotators marked the core term (*"high arched palate"*).
+- **ontogpt+belink (all) recognises the most phenotypes.** It has the highest F1 at document level (0.741) and at mention level with overlapping boundaries (0.722), +0.10 and +0.09 over the strongest baseline, PhenoTagger, and the highest precision and recall at both levels.
+- **Grounding was OntoGPT's bottleneck.** OntoGPT on its own grounds only 60% of its mentions, because its lookup needs the HPO wording exactly ("posteriorly rotated ear" fails where "posteriorly rotated ears" succeeds), and it scores lowest. Grounding with BeLink raises F1 by 0.20–0.23 at document level and at mention level with overlapping boundaries.
+- **BeLink also beats OntoGPT's lookup where the lookup succeeds.** Grounding every mention with BeLink (*all*) is better than keeping OntoGPT's ids and filling the gaps (*fill*) on every measure: +0.021 document F1, with 16 fewer false positives, even though it grounds 7 fewer mentions. Some of OntoGPT's exact-match ids are wrong, and BeLink replaces them with better ones.
+- **Exact boundaries favour the dictionary tools.** With exact boundaries, PhenoTagger leads (0.563), and ontogpt+belink (all) (0.504) is on par with FastHPOCR and NCBO. About a third of OntoGPT's correctly located mentions do not match the gold boundaries exactly, against 6–10% for the baselines. The LLM quotes the clinical phrase as written, including degree and laterality words (*"Mildly high arched palate"*), whereas the annotators marked the core term (*"high arched palate"*).
 - **NCBO is precise but misses many findings.** Exact dictionary matching rarely produces wrong concepts, but it finds less than half of the gold mentions.
 
 ## Install
