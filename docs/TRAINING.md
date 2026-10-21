@@ -68,6 +68,8 @@ python scripts/build_hpo_training_data.py mentions --obo hp.obo \
 
 This writes `data_gsc_standard_names.json` and `data_bc_standard_names.json`, one record per unique mention.
 
+The same expansion is available on its own as `belink-hpo expand --input FILE.json --output_file FILE.json` (`--model` and `--base_url` choose the LLM). It fills `standard_name` in any JSON file of records with `label` and `sentence`, and skips records that already have one, so an interrupted run can be resumed. At inference, `belink-hpo link --expand` generates the names on the fly with the same prompt.
+
 ### 4. Candidate retrieval
 
 30 names are retrieved per mention. The query vector is `0.6 × mention + 0.4 × standard name`.

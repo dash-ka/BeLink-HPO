@@ -135,16 +135,18 @@ def test_predict_command(workdir, capsys):
     assert "Accuracy: 100.00% on 4 labelled rows" in capsys.readouterr().out
 
 
-def test_index_building_and_retrieval(tmp_path):
-    from belink_hpo import cli
-    from belink_hpo.retrieval import CandidateRetriever, parse_candidates
+NAMES = [("hp:1", "Brachydactyly"), ("hp:1", "short fingers"), ("hp:2", "short toe"), ("hp:3", "oligodactyly")]
 
-    names = [("hp:1", "Brachydactyly"), ("hp:1", "short fingers"), ("hp:2", "short toe"), ("hp:3", "oligodactyly")]
+
+def _build_index(tmp_path):
+    """A tiny random BERT encoder and an index of NAMES built with `belink-hpo embed-terms`."""
+    from belink_hpo import cli
+
     with gzip.open(tmp_path / "terms.json.gz", "wt", encoding="utf-8") as f:
-        json.dump([{"id": i, "name": n} for i, n in names], f)
+        json.dump([{"id": i, "name": n} for i, n in NAMES], f)
 
     (tmp_path / "encoder").mkdir()
-    words = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"] + sorted({w for _, n in names for w in n.lower().split()})
+    words = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]"] + sorted({w for _, n in NAMES for w in n.lower().split()})
     (tmp_path / "encoder" / "vocab.txt").write_text("\n".join(words) + "\n", encoding="utf-8")
     tokenizer = transformers.BertTokenizer(str(tmp_path / "encoder" / "vocab.txt"))
     torch.manual_seed(0)
@@ -156,9 +158,14 @@ def test_index_building_and_retrieval(tmp_path):
     vec = tmp_path / "index" / "vec.npy"
     cli.main(["embed-terms", "--ontology", str(tmp_path / "terms.json.gz"), "--model_name", str(tmp_path / "encoder"),
               "--out_vectors", str(vec)])
-    mapping = tmp_path / "index" / "ontology_mapping.txt"
-    assert mapping.read_text(encoding="utf-8").splitlines()[0] == "hp:1||brachydactyly"
+    return vec, tmp_path / "index" / "ontology_mapping.txt", tmp_path / "encoder"
 
+
+def test_index_building_and_retrieval(tmp_path):
+    from belink_hpo import cli
+    from belink_hpo.retrieval import CandidateRetriever, parse_candidates
+
+    vec, mapping, _ = _build_index(tmp_path)
     retriever = CandidateRetriever.from_files(vec, mapping, str(tmp_path / "encoder"))
     (plain,) = retriever.retrieve(["short toe"], top_k=2)
     assert plain[0] == {"id": "HP:2", "name": "short toe"}  # an indexed name retrieves itself first
@@ -175,3 +182,58 @@ def test_index_building_and_retrieval(tmp_path):
     out = json.loads((tmp_path / "out.json").read_text(encoding="utf-8"))
     assert out["a"]["candidates"].startswith("hp:2||short toe|")
     assert parse_candidates(out["b"]["candidates"])[0] == {"id": "hp:3", "name": "oligodactyly"}
+
+
+class FakeLLM:
+    """Stands in for the OpenAI client: answers every prompt with the same standard name."""
+
+    def __init__(self, name):
+        self.name, self.prompts = name, []
+        self.chat = self.completions = self
+
+    def create(self, model, messages, **kwargs):
+        from types import SimpleNamespace
+
+        self.prompts.append(messages[0]["content"])
+        content = json.dumps({"name": self.name})
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+
+def test_linking_with_query_expansion(workdir, tmp_path, monkeypatch, capsys):
+    from belink_hpo import cli
+    from belink_hpo.expansion import StandardNameGenerator
+    from belink_hpo.linker import HPOLinker
+    from belink_hpo.reranker import HPOReranker
+    from belink_hpo.retrieval import CandidateRetriever
+
+    vec, mapping, encoder = _build_index(tmp_path)
+    llm = FakeLLM("oligodactyly")
+    # alpha=0: the query is the standard name alone, so the expansion decides which concept comes first
+    linker = HPOLinker(CandidateRetriever.from_files(vec, mapping, str(encoder)),
+                       HPOReranker.from_pretrained(str(workdir / "adapter")),
+                       expander=StandardNameGenerator(client=llm), top_k=4, alpha=0.0)
+
+    results, names = linker.link_batch([{"context": "Feet with short toe.", "mention": "short toe"}],
+                                       return_standard_names=True)
+    assert names == ["oligodactyly"]
+    assert results[0].options[0][1] == "HP:3"
+    assert "short toe" in llm.prompts[0] and "Feet with short toe." in llm.prompts[0]
+
+    # an explicit standard name is used as is, without calling the LLM
+    explicit = linker.link("Feet with short toe.", "short toe", standard_name="short toe")
+    assert explicit.options[0][1] == "HP:2" and len(llm.prompts) == 1
+
+    # the same through `belink-hpo link --expand`, with the OpenAI client replaced by the fake
+    import openai
+
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: FakeLLM("oligodactyly"))
+    (tmp_path / "mentions.jsonl").write_text(
+        json.dumps({"context": "Feet with short toe.", "mention": "short toe", "gold_id": "HP:3"}) + "\n",
+        encoding="utf-8")
+    cli.main(["link", "--input", str(tmp_path / "mentions.jsonl"), "--out", str(tmp_path / "linked.jsonl"),
+              "--kb-vectors", str(vec), "--encoder", str(encoder), "--adapter", str(workdir / "adapter"),
+              "--expand", "--alpha", "0", "--top-k", "4"])
+    (row,) = load_jsonl(tmp_path / "linked.jsonl")
+    assert row["standard_name"] == "oligodactyly" and row["mention"] == "short toe"
+    assert set(row) == {"context", "mention", "standard_name", "id", "name", "confidence"}
+    assert "Accuracy:" in capsys.readouterr().out

@@ -1,3 +1,4 @@
+import json
 from belink_hpo.dataset import accuracy_at_1, prepare_test, prepare_train, split_examples
 from belink_hpo.prompt import augment_name, build_user_message, select_options
 
@@ -125,3 +126,63 @@ def test_prepare_obo_command(tmp_path):
     ]
     preferred = json.loads((tmp_path / "index" / "preferred_names.json").read_text(encoding="utf-8"))
     assert preferred == {"HP:0001831": "Short toe"}
+
+
+class _Answer:
+    def __init__(self, answers):
+        self.answers, self.calls = list(answers), 0
+        self.chat = self.completions = self
+
+    def create(self, **kwargs):
+        from types import SimpleNamespace
+
+        self.calls += 1
+        content = self.answers.pop(0)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+
+def test_standard_name_generator_caches_and_handles_bad_answers():
+    from belink_hpo.expansion import StandardNameGenerator, add_standard_names
+
+    client = _Answer(['{"name": " Short toe "}'])
+    namer = StandardNameGenerator(client=client, retry_delay=0)
+    assert namer("stubby toes", "Feet: stubby toes.") == "Short toe"
+    assert namer("stubby toes", "Feet: stubby toes.") == "Short toe" and client.calls == 1
+
+    bad = StandardNameGenerator(client=_Answer(["not json", '{"other": 1}', '{"name": ""}']), retry_delay=0)
+    assert bad("x", "y") is None
+
+    records = {"a": {"label": "stubby toes", "sentence": "Feet: stubby toes."},
+               "b": {"label": "x", "sentence": "y", "standard_name": "kept"}}
+    add_standard_names(records, generator=StandardNameGenerator(client=_Answer(['{"name": "Short toe"}']), retry_delay=0))
+    assert records["a"]["standard_name"] == "Short toe" and records["b"]["standard_name"] == "kept"
+
+
+def test_expand_command(tmp_path, monkeypatch):
+    openai = __import__("pytest").importorskip("openai")
+    from belink_hpo import cli
+
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: _Answer(['{"name": "Short toe"}']))
+    (tmp_path / "m.json").write_text(json.dumps({"stubby toes": {"label": "stubby toes", "sentence": "Feet."}}),
+                                     encoding="utf-8")
+    cli.main(["expand", "--input", str(tmp_path / "m.json"), "--output_file", str(tmp_path / "m.json")])
+    assert json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))["stubby toes"]["standard_name"] == "Short toe"
+
+
+def test_linker_expands_only_missing_standard_names():
+    from belink_hpo.linker import HPOLinker
+
+    seen = {}
+
+    class Retriever:
+        def retrieve(self, mentions, standard_names, *args):
+            seen["names"] = standard_names
+            return [[{"id": "HP:1", "name": m}] for m in mentions]
+
+    class Reranker:
+        def rerank_batch(self, items, batch_size=32):
+            return [None for _ in items]
+
+    linker = HPOLinker(Retriever(), Reranker(), expander=lambda mention, context: mention.upper())
+    linker.link_batch([{"context": "c", "mention": "a"}, {"context": "c", "mention": "b", "standard_name": "given"}])
+    assert seen["names"] == ["A", "given"]

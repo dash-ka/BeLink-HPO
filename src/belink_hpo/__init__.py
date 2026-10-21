@@ -10,6 +10,7 @@ _LAZY = {
     "CandidateRetriever": "belink_hpo.retrieval",
     "HPOLinker": "belink_hpo.linker",
     "OntoReader": "belink_hpo.ontology",
+    "StandardNameGenerator": "belink_hpo.expansion",
 }
 
 __all__ = ["DEFAULT_MODEL", *_LAZY]
