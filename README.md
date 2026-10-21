@@ -37,7 +37,7 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 - **Corpus:** BioCreative VIII Track 3 development set (`Clinical-Genetics-Physical-Exam-Data-Dev.tsv`): 454 physical-examination observations with 685 HPO annotations, 78 of them negated.
 - **Negated annotations** (e.g. *"Normal lips"* annotated with *Abnormal lip morphology*) are removed from the gold standard, leaving 607 mentions. Systems are not asked to classify mentions as present or negated; every prediction is scored.
 - **Scope:** all systems are restricted to the *Phenotypic abnormality* branch of HPO (HP:0000118), the scope of the gold standard. FastHPOCR and PhenoTagger are restricted by construction. For NCBO and OntoGPT, predictions outside the branch (mostly clinical modifiers such as *mild* or *bilateral*) are removed: 197 for NCBO and 2 for OntoGPT + BeLink.
-- **BeLink model:** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training.
+- **BeLink model:** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training [model](https://huggingface.co/Dash00/qwen3-4b-lora-hpo-gsc-reranker).
 
 ### Systems
 
