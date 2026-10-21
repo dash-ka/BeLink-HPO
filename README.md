@@ -37,13 +37,13 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 - **Corpus:** BioCreative VIII Track 3 development set (`Clinical-Genetics-Physical-Exam-Data-Dev.tsv`): 454 physical-examination observations with 685 HPO annotations, 78 of them negated.
 - **Negated annotations** (e.g. *"Normal lips"* annotated with *Abnormal lip morphology*) are removed from the gold standard, leaving 607 mentions. Systems are not asked to classify mentions as present or negated; every prediction is scored.
 - **Scope:** all systems are restricted to the *Phenotypic abnormality* branch of HPO (HP:0000118), the scope of the gold standard. FastHPOCR and PhenoTagger are restricted by construction. For NCBO and OntoGPT, predictions outside the branch (mostly clinical modifiers such as *mild* or *bilateral*) are removed: 197 for NCBO and 2 for each BeLink pipeline.
-- **[BeLink model](https://huggingface.co/Dash00/qwen3-4b-lora-hpo-gsc-reranker):** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training.
+- **BeLink model:** the re-ranker trained on HPO-GSC+ only, so the evaluation corpus was not seen in training.
 
 ### Systems
 
 | System | Approach |
 |---|---|
-| [FastHPOCR](https://github.com/tudorgroza/fast_hpo_cr) | Dictionary-based concept recognition over HPO labels and synonyms, using clusters of related tokens. Index built from the same `hp.obo`, restricted to HP:0000118. |
+| [FastHPOCR](https://github.com/tudorgroza/fast_hpo_cr) | Dictionary-based concept recognition over HPO labels and synonyms, using clusters of related tokens. Default configuration (v0.1.4), index built from the same `hp.obo`. Also shown with longest-match output, which keeps only the longest of nested matches. |
 | [PhenoTagger](https://github.com/ncbi-nlp/PhenoTagger) v1.2 | Hybrid dictionary and deep-learning tagger (Bioformer model, threshold 0.95, longest-match off). Its NegBio negation step is not used. |
 | [NCBO Annotator](https://bioportal.bioontology.org/annotator) | BioPortal's dictionary-based annotation web service, run with the HP ontology. |
 | [OntoGPT](https://github.com/monarch-initiative/ontogpt) | LLM extraction with SPIRES (`gpt-oss-120b`, temperature 0) using a template that quotes every phenotype mention and names it as a short HPO-style term. Grounded by OntoGPT's own lookup of HPO labels and synonyms. |
@@ -57,13 +57,14 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 
 ### Results
 
-Best values in bold.
+Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True`), a setting chosen on this corpus and shown for reference; the FastHPOCR row is its default configuration.
 
 **Document level**
 
 | System | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
 | FastHPOCR | 369 | 278 | 235 | 0.570 | 0.611 | 0.590 |
+| FastHPOCR, longest match † | 362 | 179 | 242 | 0.669 | 0.599 | 0.632 |
 | PhenoTagger | 424 | 300 | 180 | 0.586 | 0.702 | 0.639 |
 | NCBO Annotator | 277 | **123** | 327 | 0.693 | 0.459 | 0.552 |
 | OntoGPT | 323 | 329 | 281 | 0.495 | 0.535 | 0.514 |
@@ -75,6 +76,7 @@ Best values in bold.
 | System | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
 | FastHPOCR | 369 | 353 | 238 | 0.511 | 0.608 | 0.555 |
+| FastHPOCR, longest match † | 362 | 212 | 245 | 0.631 | 0.596 | 0.613 |
 | PhenoTagger | 424 | 318 | 183 | 0.571 | 0.699 | 0.629 |
 | NCBO Annotator | 278 | **132** | 329 | 0.678 | 0.458 | 0.547 |
 | OntoGPT | 317 | 340 | 290 | 0.482 | 0.522 | 0.502 |
@@ -86,6 +88,7 @@ Best values in bold.
 | System | TP | FP | FN | Precision | Recall | F1 |
 |---|---:|---:|---:|---:|---:|---:|
 | FastHPOCR | 337 | 385 | 270 | 0.467 | 0.555 | 0.507 |
+| FastHPOCR, longest match † | 325 | 249 | 282 | 0.566 | 0.535 | 0.550 |
 | PhenoTagger | **380** | 362 | **227** | 0.512 | **0.626** | **0.563** |
 | NCBO Annotator | 260 | **150** | 347 | **0.634** | 0.428 | 0.511 |
 | OntoGPT | 220 | 437 | 387 | 0.335 | 0.362 | 0.348 |
@@ -109,6 +112,7 @@ Best values in bold.
 - **Grounding was OntoGPT's bottleneck.** OntoGPT on its own grounds only 60% of its mentions, because its lookup needs the HPO wording exactly ("posteriorly rotated ear" fails where "posteriorly rotated ears" succeeds), and it scores lowest. Grounding with BeLink raises F1 by 0.20–0.23 at document level and at mention level with overlapping boundaries.
 - **BeLink also beats OntoGPT's lookup where the lookup succeeds.** Grounding every mention with BeLink (*all*) is better than keeping OntoGPT's ids and filling the gaps (*fill*) on every measure: +0.021 document F1, with 16 fewer false positives, even though it grounds 7 fewer mentions. Some of OntoGPT's exact-match ids are wrong, and BeLink replaces them with better ones.
 - **Exact boundaries favour the dictionary tools.** With exact boundaries, PhenoTagger leads (0.563), and ontogpt+belink (all) (0.504) is on par with FastHPOCR and NCBO. About a third of OntoGPT's correctly located mentions do not match the gold boundaries exactly, against 6–10% for the baselines. The LLM quotes the clinical phrase as written, including degree and laterality words (*"Mildly high arched palate"*), whereas the annotators marked the core term (*"high arched palate"*).
+- **FastHPOCR benefits from longest-match output.** Dropping matches nested in a longer one (e.g. *Abnormal thumb* inside *Abnormal thumb morphology*) removes 99 document-level false positives for 7 lost true positives, raising document F1 from 0.590 to 0.632, close to PhenoTagger (0.639).
 - **NCBO is precise but misses many findings.** Exact dictionary matching rarely produces wrong concepts, but it finds less than half of the gold mentions.
 
 ## Install
