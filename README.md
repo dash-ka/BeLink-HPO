@@ -137,18 +137,7 @@ Each missed gold concept is assigned to the first step that failed, using BeLink
 | re-ranker chose another option | 57 | no gold mention at that position | 32 |
 | of which one step too general / too specific | 21 / 7 | finding negated in the text / quote not found in the text | 4 / 6 |
 
-A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept one or two steps from a missed gold concept in the same observation as correct (39 pairs) gives a lenient document F1 of 0.850.
-
-#### Secondary scoring: ungrounded mentions as false positives
-
-The same runs, with every ungrounded mention counted as a false positive (as plain OntoGPT output would be used). Baseline rows are unchanged.
-
-| System | Doc TP / FP / FN | Doc P / R / F1 | Mention F1, overlap | Mention F1, exact |
-|---|---:|---:|---:|---:|
-| OntoGPT | 323 / 329 / 281 | 0.495 / 0.535 / 0.514 | 0.502 | 0.348 |
-| ontogpt+belink (fill) | 450 / 196 / 154 | 0.697 / 0.745 / 0.720 | 0.702 | 0.475 |
-| ontogpt+belink (all) | 461 / 180 / 143 | 0.719 / 0.763 / 0.741 | 0.722 | 0.504 |
-| ontogpt+belink (all), quote (OntoGPT's term) | 468 / 181 / 136 | 0.721 / 0.775 / 0.747 | 0.727 | 0.494 |
+A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept one or two steps from a missed gold concept in the same observation as correct (37 pairs) gives a lenient document F1 of 0.847.
 
 ### Findings
 
