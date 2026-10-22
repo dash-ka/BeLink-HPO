@@ -56,6 +56,15 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 - **Mention level:** each mention with its position in the text. A prediction is a true positive if it has the same HPO id as a gold mention and the same character boundaries (*exact*) or overlapping ones (*overlap*). Each gold mention can be matched only once.
 - **Ungrounded mentions are abstentions.** A mention left without an HPO concept (OntoGPT's lookup failed and, in the BeLink pipelines, BeLink answered *None of the above*) is not counted as a prediction. BeLink is designed to abstain when no candidate fits; the gold concept it missed still counts as a false negative, so recall is unaffected. The baselines output only concepts they matched, so the rule only affects the OntoGPT rows. Scores with ungrounded mentions counted as false positives are given [below](#secondary-scoring-ungrounded-mentions-as-false-positives).
 
+**What the totals count.** Recall and precision have different denominators. Recall = TP / (TP + FN) is the share of the **gold** that was found, so TP + FN is always the gold total, the same for every system: **607 gold mentions** (685 annotations minus the 78 negated ones) at mention level, and **604 gold concepts** at document level, where each concept counts once per observation (three concepts are annotated twice in one observation). Precision = TP / (TP + FP) is the share of the **predictions** that were right, so TP + FP is the system's own prediction total. For ontogpt+belink (all) with overlapping boundaries:
+
+| Level | TP + FN (gold) | TP + FP (predictions) |
+|---|---|---|
+| Mention | 453 + 154 = **607** gold mentions | 453 + 124 = 577 predicted mentions |
+| Document | 461 + 143 = **604** gold concepts | 461 + 111 = 572 predicted concepts |
+
+The LLM extracted 662 mentions; they reach 577 scored predictions in three steps: 74 that BeLink left ungrounded are dropped as abstentions (662 → 588), 2 outside *Phenotypic abnormality* are removed (588 → 586), and identical predictions are merged (586 → 577), since a mention is scored as (concept, start, end) and repeated quotes, or quotes that could not be located, can give the same triple twice. At document level the predictions merge the same way, to 572 distinct concepts per observation.
+
 ### Results
 
 Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True`), a setting chosen on this corpus and shown for reference; the FastHPOCR row is its default configuration.
@@ -160,7 +169,7 @@ Each missed gold concept is assigned to the first step that failed, using BeLink
 | re-ranker chose another option | 57 | no gold mention at that position | 32 |
 | of which one step too general / too specific | 21 / 7 | finding negated in the text / quote not found in the text | 4 / 6 |
 
-A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*).
+A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept as correct when it is one or two HPO steps from a missed gold concept and its quote overlaps that concept's gold span (37 pairs) gives a lenient document F1 of 0.847.
 
 **Lenient scoring.** A near miss pairs a wrong predicted concept with a missed gold concept in the same observation when one is the ancestor or descendant of the other within two HPO steps and the predicted concept's quote overlaps the missed concept's gold span. Pairs are matched one-to-one, closest first, and each pair counts as a true positive instead of a false positive and a false negative.
 
