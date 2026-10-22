@@ -30,7 +30,7 @@ The released adapter was then re-trained on both corpora, so it has no held-out 
 
 ## Evaluation: phenotype recognition with OntoGPT and BeLink
 
-BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and grounded them with BeLink in two ways: only the mentions OntoGPT could not ground itself (*fill*), or every mention (*all*). Both pipelines were compared with three established HPO concept recognisers on the same corpus.
+BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and grounded them with BeLink in two ways: only the mentions OntoGPT could not ground itself (*fill*), or every mention (*rerank-all*). Both pipelines were compared with three established HPO concept recognisers on the same corpus.
 
 ### Setup
 
@@ -48,7 +48,7 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 | [NCBO Annotator](https://bioportal.bioontology.org/annotator) | BioPortal's dictionary-based annotation web service, run with the HP ontology. |
 | [OntoGPT](https://github.com/monarch-initiative/ontogpt) | LLM extraction with SPIRES (`gpt-oss-120b`, temperature 0) using a template that quotes every phenotype mention and names it as a short HPO-style term. Grounded by OntoGPT's own lookup of HPO labels and synonyms. |
 | ontogpt+belink (fill) | The same OntoGPT extractions. Mentions OntoGPT could not ground are linked by BeLink (SapBERT retrieval + re-ranking); OntoGPT's own HPO ids are kept for the rest. |
-| **ontogpt+belink (all)** | The same OntoGPT extractions, all linked by BeLink; OntoGPT's own ids are not used. A mention BeLink declines (*None of the above*) is left ungrounded, i.e. BeLink abstains. |
+| **ontogpt+belink (rerank-all)** | The same OntoGPT extractions, all linked by BeLink; OntoGPT's own ids are not used. A mention BeLink declines (*None of the above*) is left ungrounded, i.e. BeLink abstains. |
 
 ### Metrics
 
@@ -70,7 +70,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 277 | 123 | 327 | 0.693 | 0.459 | 0.552 |
 | OntoGPT | 323 | **71** | 281 | **0.820** | 0.535 | 0.647 |
 | ontogpt+belink (fill) | 450 | 134 | 154 | 0.771 | 0.745 | 0.758 |
-| **ontogpt+belink (all)** | **461** | 111 | **143** | 0.806 | **0.763** | **0.784** |
+| **ontogpt+belink (rerank-all)** | **461** | 111 | **143** | 0.806 | **0.763** | **0.784** |
 
 **Mention level, overlapping boundaries**
 
@@ -82,7 +82,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 278 | 132 | 329 | 0.678 | 0.458 | 0.547 |
 | OntoGPT | 317 | **80** | 290 | **0.798** | 0.522 | 0.631 |
 | ontogpt+belink (fill) | 442 | 148 | 165 | 0.749 | 0.728 | 0.739 |
-| **ontogpt+belink (all)** | **453** | 124 | **154** | 0.785 | **0.746** | **0.765** |
+| **ontogpt+belink (rerank-all)** | **453** | 124 | **154** | 0.785 | **0.746** | **0.765** |
 
 **Mention level, exact boundaries**
 
@@ -94,7 +94,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 260 | **150** | 347 | **0.634** | 0.428 | 0.511 |
 | OntoGPT | 220 | 177 | 387 | 0.554 | 0.362 | 0.438 |
 | ontogpt+belink (fill) | 299 | 291 | 308 | 0.507 | 0.493 | 0.500 |
-| ontogpt+belink (all) | 316 | 261 | 291 | 0.548 | 0.521 | 0.534 |
+| ontogpt+belink (rerank-all) | 316 | 261 | 291 | 0.548 | 0.521 | 0.534 |
 
 **Effect of grounding with BeLink** (same extracted mentions)
 
