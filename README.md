@@ -160,7 +160,7 @@ Each missed gold concept is assigned to the first step that failed, using BeLink
 | re-ranker chose another option | 57 | no gold mention at that position | 32 |
 | of which one step too general / too specific | 21 / 7 | finding negated in the text / quote not found in the text | 4 / 6 |
 
-A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept as correct when it is one or two HPO steps from a missed gold concept and its quote overlaps that concept's gold span (37 pairs) gives a lenient document F1 of 0.847.
+A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*).
 
 **Lenient scoring.** A near miss pairs a wrong predicted concept with a missed gold concept in the same observation when one is the ancestor or descendant of the other within two HPO steps and the predicted concept's quote overlaps the missed concept's gold span. Pairs are matched one-to-one, closest first, and each pair counts as a true positive instead of a false positive and a false negative.
 
