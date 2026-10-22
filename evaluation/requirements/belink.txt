@@ -1,0 +1,16 @@
+# BeLink relinking (venv "belink", Python 3.10, CUDA 12.8 GPU)
+# Only what belink_linker.py needs. The reported runs used ~/belink-test, which also held OntoGPT
+# and other tools; its full freeze is in frozen/belink-test.txt.
+--extra-index-url https://download.pytorch.org/whl/cu128
+-c constraints/belink-test.txt
+belink-hpo @ git+https://github.com/dash-ka/BeLink-HPO.git@af084c7a232f02ecc3f29531d120af0b183327cf
+torch==2.8.0+cu128
+transformers==5.17.0
+peft==0.21.2
+accelerate==1.15.0
+numpy==2.2.6
+tqdm==4.70.1
+safetensors==0.8.0
+tokenizers==0.23.3
+huggingface_hub==1.33.0
+pronto==2.7.3            # belink-hpo prepare-obo reads hp.obo

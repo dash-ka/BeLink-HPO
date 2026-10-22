@@ -1,0 +1,3 @@
+# vLLM server for gpt-oss-120b (venv "vllm", Python 3.10, CUDA 12.8 GPU)
+-c constraints/vllm.txt
+vllm==0.10.2

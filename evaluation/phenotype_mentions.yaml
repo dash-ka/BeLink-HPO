@@ -1,0 +1,78 @@
+id: http://w3id.org/ontogpt/phenotype_mentions
+name: phenotype_mentions
+title: Clinical phenotype mention recognition
+description: >-
+  An OntoGPT (SPIRES) template for recognising every mention of a clinical
+  phenotype (a phenotypic abnormality) in a short clinical text, such as a
+  physical examination note, and grounding it to the Human Phenotype Ontology.
+  Mentions are not attributed to patients and are not classified as present or
+  absent.
+license: https://creativecommons.org/publicdomain/zero/1.0/
+prefixes:
+  rdf: http://www.w3.org/1999/02/22-rdf-syntax-ns#
+  HP: http://purl.obolibrary.org/obo/HP_
+  linkml: https://w3id.org/linkml/
+  phenotype_mentions: http://w3id.org/ontogpt/phenotype_mentions/
+
+default_prefix: phenotype_mentions
+default_range: string
+
+# Note: the extraction instructions are written in each slot's `description`.
+# OntoGPT 1.2.0 does not pick up slot-level `annotations: prompt` text, but it
+# does use the description, so this form works in both cases.
+
+imports:
+  - linkml:types
+  - core
+
+classes:
+  PhenotypeMentions:
+    tree_root: true
+    description: All mentions of clinical phenotypes in the input text.
+    attributes:
+      phenotype_spans:
+        multivalued: true
+        description: >-
+          A semicolon-separated list of exact quotations, one for each mention
+          of a clinical phenotype in the text, in the order they appear. A
+          clinical phenotype is a phenotypic abnormality: a sign, symptom,
+          physical or dysmorphic feature, abnormal measurement, or abnormal
+          laboratory or imaging finding. If the same phenotype is mentioned more than once, quote every mention.
+          Do not quote body parts or features that are only described as normal, diagnoses of syndromes, treatments, procedures.
+          Copy each quotation verbatim from the text, as the shortest run of
+          words that names the phenotype: do not rephrase, normalise or expand
+          abbreviations. Give exactly one quotation per phenotype: split combined
+          phrases, including phenotypes joined by "and", "or", "/" or commas
+          (for example "hypotonia and seizures" becomes "hypotonia; seizures").
+          When phenotypes share words, such as "short and broad thumbs", quote
+          the whole shared phrase once for each phenotype ("short and broad
+          thumbs; short and broad thumbs"). If a quotation contains a semicolon,
+          replace it with a comma. Leave this field completely empty if the text
+          mentions no clinical phenotype. Write the whole list on a single line
+          after the field name, separated by semicolons: no line breaks,
+          numbering or bullets.
+      phenotypes:
+        range: Phenotype
+        multivalued: true
+        description: >-
+          For each quotation in phenotype_spans and in the same order, the
+          phenotype it names, as a short medical term in the style of the Human
+          Phenotype Ontology that keeps the body part and the kind of change
+          (for example "high palate", "upslanted palpebral fissure", "broad
+          thumb", "short thumb", "clinodactyly of the 5th finger"). Give exactly one
+          term per quotation, including repeated quotations. For a numeric
+          result, name the abnormality (for example "elevated serum creatinine").
+          If phenotype_spans is empty, leave this field completely empty:
+          never write words such as none, unknown or not reported.
+          Write the whole list on a single line after the field name, separated by
+          semicolons: no line breaks, numbering or bullets.
+
+  Phenotype:
+    is_a: NamedEntity
+    description: A phenotypic abnormality, grounded to an HPO term.
+    id_prefixes:
+      - HP
+    annotations:
+      annotators: sqlite:obo:hp
+      prompt: >-
+        The name of a human phenotypic abnormality, as a short medical term.

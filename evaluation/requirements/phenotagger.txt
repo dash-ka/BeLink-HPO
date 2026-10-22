@@ -1,0 +1,11 @@
+# PhenoTagger v1.2 baseline (venv "phenotagger", Python 3.10). NegBio is not installed: the
+# evaluation stubs it out (recognition only).
+-c constraints/phenotagger.txt
+tensorflow==2.12.0
+keras==2.12.0
+transformers==4.30.1
+torch==1.11.0
+numpy==1.23.5
+nltk==3.8.1
+bioc==2.0.post5
+huggingface-hub==0.25.2

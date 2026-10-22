@@ -1,0 +1,6 @@
+# large or local files: not committed
+data/
+results/
+venvs/
+adapters/
+tools/
