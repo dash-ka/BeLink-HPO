@@ -106,6 +106,24 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | Mention-level F1, overlap | 0.502 | 0.702 | 0.722 | +0.200 | +0.221 |
 | Mention-level F1, exact | 0.348 | 0.475 | 0.504 | +0.127 | +0.156 |
 
+**Ablation: OntoGPT's term in the re-ranker prompt** (ontogpt+belink (all))
+
+By default the re-ranker sees the quote alone (*mild up-slant*). In this ablation it sees the quote followed by OntoGPT's term, *mild up-slant (upslanted palpebral fissure)*. Retrieval is the same in both: the query combines the quote (weight 0.6) and OntoGPT's term (0.4).
+
+| Re-ranker sees | Doc TP | Doc FP | Doc FN | Doc F1 | Mention F1, overlap | Mention F1, exact | Grounded mentions |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Quote only (main setting) | 461 | 180 | 143 | 0.741 | 0.722 | **0.504** | 588 |
+| Quote (OntoGPT's term) | **468** | 181 | **136** | **0.747** | **0.727** | 0.494 | 601 |
+
+| On the 398 mentions OntoGPT grounded itself | Quote only | Quote (OntoGPT's term) |
+|---|---:|---:|
+| BeLink keeps OntoGPT's id | 351 | 374 |
+| BeLink changes it: fixed / broken | 26 / 6 | 20 / 1 |
+| BeLink declines | 5 | 0 |
+| Net change in correct ids | +18 | +19 |
+
+The term makes BeLink follow OntoGPT more closely: it breaks almost no correct ids, but also corrects fewer wrong ones. The F1 differences are not significant: document F1 +0.006 (95% CI −0.010 to +0.022, p = 0.42) and overlap mention F1 +0.005 (−0.011 to +0.021, p = 0.53), from a paired bootstrap over the 454 observations. The mention ids differ on only 30 of 662 mentions (12 vs 18 correct; McNemar p = 0.36). The quote-only setting is kept as the main configuration, because it is how the re-ranker was trained.
+
 ### Findings
 
 - **ontogpt+belink (all) recognises the most phenotypes.** It has the highest F1 at document level (0.741) and at mention level with overlapping boundaries (0.722), +0.10 and +0.09 over the strongest baseline, PhenoTagger, and the highest precision and recall at both levels.
@@ -113,6 +131,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 - **BeLink also beats OntoGPT's lookup where the lookup succeeds.** Grounding every mention with BeLink (*all*) is better than keeping OntoGPT's ids and filling the gaps (*fill*) on every measure: +0.021 document F1, with 16 fewer false positives, even though it grounds 7 fewer mentions. Some of OntoGPT's exact-match ids are wrong, and BeLink replaces them with better ones.
 - **Exact boundaries favour the dictionary tools.** With exact boundaries, PhenoTagger leads (0.563), and ontogpt+belink (all) (0.504) is on par with FastHPOCR and NCBO. About a third of OntoGPT's correctly located mentions do not match the gold boundaries exactly, against 6–10% for the baselines. The LLM quotes the clinical phrase as written, including degree and laterality words (*"Mildly high arched palate"*), whereas the annotators marked the core term (*"high arched palate"*).
 - **FastHPOCR benefits from longest-match output.** Dropping matches nested in a longer one (e.g. *Abnormal thumb* inside *Abnormal thumb morphology*) removes 99 document-level false positives for 7 lost true positives, raising document F1 from 0.590 to 0.632, close to PhenoTagger (0.639).
+- **Adding OntoGPT's term to the re-ranker prompt changes how BeLink behaves rather than how well it scores.** BeLink becomes more conservative (1 broken id instead of 6), with no significant change in F1 (document +0.006, p = 0.42).
 - **NCBO is precise but misses many findings.** Exact dictionary matching rarely produces wrong concepts, but it finds less than half of the gold mentions.
 
 ## Install
@@ -182,7 +201,7 @@ Which commands use preferred names depends on who writes the prompt:
 
 | Command or function | Who writes the prompt | Preferred names |
 |---|---|---|
-| `rerank`, `rerank_batch`, `belink-hpo rerank`, `belink-hpo link`, `HPOLinker` | The package, from your candidates | Only if you pass `preferred_names` / `--preferred-names` |
+| `rerank`, `rerank_batch`, `belink-hpo rerank`, `HPOLinker` | The package, from your candidates | Only if you pass `preferred_names` / `--preferred-names` |
 | `belink-hpo build-dataset`, `prepare_train`, `prepare_test` | The package, from your examples | Only if you pass `--preferred-names` / `preferred_names` |
 | `predict_labels`, `belink-hpo predict` | You, beforehand | Not applied: prompts are scored exactly as written |
 
@@ -196,66 +215,36 @@ belink-hpo rerank --input mentions.jsonl --out linked.jsonl --preferred-names in
 
 `mentions.jsonl` has one JSON object per line with `context`, `mention` and `candidates` (see [`examples/examples.jsonl`](examples/examples.jsonl)). If a line also has `gold_id`, accuracy is printed.
 
-## Full pipeline: expansion, retrieval, re-ranking
+## Full pipeline: retrieval + re-ranking
 
-The re-ranker needs candidates. The package includes the pipeline that produced the reported numbers, in three steps:
+The re-ranker needs candidates. This package includes the dense retriever used to build the training data: [SapBERT](https://huggingface.co/cambridgeltl/SapBERT-from-PubMedBERT-fulltext) embeddings of every HPO name and synonym, searched by inner product.
 
-1. **Query expansion.** An LLM is given the mention and its sentence and asked for the standard HPO name of the concept, e.g. `mild up-slant` → `Upslanted palpebral fissure`.
-2. **Retrieval.** [SapBERT](https://huggingface.co/cambridgeltl/SapBERT-from-PubMedBERT-fulltext) embeds the mention and the standard name; the query is `0.6 × mention + 0.4 × standard name`, searched against every HPO name and synonym. The top 30 names are kept.
-3. **Re-ranking.** The fine-tuned model picks one of the first 10 concepts, or "None of the above".
-
-Expansion is optional. Without it, retrieval uses the mention text alone and finds the right concept less often, so the top-1 retrieval figure in [Results](#results) only holds with expansion.
-
-### Build the index once
-
-Details in [docs/TRAINING.md](docs/TRAINING.md#1-hpo-name-index).
+Build the index once (details in [docs/TRAINING.md](docs/TRAINING.md#1-hpo-name-index)):
 
 ```bash
 belink-hpo prepare-obo --ontology_path hp.obo --output_dir index
 belink-hpo embed-terms --ontology index/terminology.json.gz --out_vectors index/hpo_vec.npy
 ```
 
-### Link mentions from the command line
-
-`mentions.jsonl` has one JSON object per line with `context` and `mention`:
-
-```bash
-pip install "belink-hpo[expand] @ git+https://github.com/dash-ka/BeLink-HPO.git"
-export OPENAI_API_KEY=...
-
-belink-hpo link --input mentions.jsonl --out linked.jsonl \
-    --kb-vectors index/hpo_vec.npy --preferred-names index/preferred_names.json --expand
-```
-
-Each output line has the mention, the generated `standard_name`, and the chosen `id`, `name` and `confidence`. If the input lines have `gold_id`, accuracy is printed.
-
-- **Without `--expand`**, no LLM is called. A `standard_name` already present in an input line is still used.
-- **`--llm`** chooses the model (default `gpt-5.4`, as for the reported numbers). **`--llm-base-url`** points at any OpenAI-compatible server, such as a local vLLM; the `OPENAI_BASE_URL` environment variable works too.
-- **`--top-k`** and **`--alpha`** change how many names are retrieved and the weight of the mention against the standard name.
-
-Expansion sends each mention and its sentence to the LLM provider. With clinical text, check that this is allowed, or use a model you host yourself through `--llm-base-url`.
-
-### Link mentions in Python
+Then link mentions:
 
 ```python
-from belink_hpo import CandidateRetriever, HPOLinker, HPOReranker, StandardNameGenerator
+from belink_hpo import CandidateRetriever, HPOLinker, HPOReranker
 from belink_hpo.ontology import load_preferred_names
 
 linker = HPOLinker(
     CandidateRetriever.from_files("index/hpo_vec.npy", "index/ontology_mapping.txt"),
     HPOReranker.from_pretrained(preferred_names=load_preferred_names("index/preferred_names.json")),
-    expander=StandardNameGenerator(),        # leave out to skip expansion
 )
 
-result = linker.link(context="EYES: mild epicanthus, mild up-slant.", mention="mild up-slant")
-result.id      # e.g. "HP:0000582"
+result = linker.link(
+    context="EYES: mild epicanthus, mild up-slant.",
+    mention="mild up-slant",
+    standard_name="Upslanted palpebral fissure",   # optional
+)
 ```
 
-`linker.link(..., standard_name="Upslanted palpebral fissure")` uses your own standard name instead of calling the LLM. The expander can also be any function `(mention, context) -> name`, for example one calling another LLM API. Generated names are cached, so a mention repeated in the same context is sent only once.
-
-### Generate standard names separately
-
-To run each step on its own, as was done to build the training data, `belink-hpo expand` adds a `standard_name` to every record of a JSON file of mentions, and `belink-hpo retrieve --apply_grf` then uses it. See [docs/TRAINING.md](docs/TRAINING.md#3-standard-names-for-the-mentions).
+`standard_name` is a canonical name for the mention, which is mixed into the retrieval query. The reported numbers use standard names generated by an LLM (`belink_hpo.expansion`). Without it, retrieval uses the mention text alone and will find the right concept less often.
 
 ## Fine-tuning
 
@@ -271,15 +260,13 @@ belink-hpo predict --file data/test.jsonl --adapter my-reranker
 
 | Command | Purpose |
 |---|---|
-| `belink-hpo link` | Expansion, retrieval and re-ranking for a JSONL file of mentions |
-| `belink-hpo rerank` | Choose an HPO id for each mention in a JSONL file whose candidates you already have |
+| `belink-hpo rerank` | Choose an HPO id for each mention in a JSONL file |
 | `belink-hpo predict` | Predict option letters for a file of ready-made prompts, and report accuracy |
 | `belink-hpo train` | Fine-tune a LoRA adapter |
 | `belink-hpo build-dataset` | Turn examples with candidates into training and test prompts |
 | `belink-hpo prepare-obo` | Turn an OBO ontology into the list of names to index |
 | `belink-hpo embed-terms` | Embed ontology names into a retrieval index |
 | `belink-hpo retrieve` | Retrieve candidates for a JSON file of mentions |
-| `belink-hpo expand` | Generate standard names for a JSON file of mentions with an LLM |
 
 Run any command with `--help` for its options.
 
