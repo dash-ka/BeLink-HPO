@@ -30,7 +30,7 @@ The released adapter was then re-trained on both corpora, so it has no held-out 
 
 ## Evaluation: phenotype recognition with OntoGPT and BeLink
 
-BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and grounded them with BeLink in two ways: only the mentions OntoGPT could not ground itself (*fill*), or every mention (*rerank-all*). Both pipelines were compared with three established HPO concept recognisers on the same corpus.
+BeLink can ground the phenotype mentions that an LLM extracts from clinical text. We extracted every phenotype mention with [OntoGPT](https://github.com/monarch-initiative/ontogpt) and grounded them with BeLink in two ways: only the mentions OntoGPT could not ground itself (*fill*), or every mention (*all*). Both pipelines were compared with three established HPO concept recognisers on the same corpus.
 
 ### Setup
 
@@ -48,13 +48,13 @@ BeLink can ground the phenotype mentions that an LLM extracts from clinical text
 | [NCBO Annotator](https://bioportal.bioontology.org/annotator) | BioPortal's dictionary-based annotation web service, run with the HP ontology. |
 | [OntoGPT](https://github.com/monarch-initiative/ontogpt) | LLM extraction with SPIRES (`gpt-oss-120b`, temperature 0) using a template that quotes every phenotype mention and names it as a short HPO-style term. Grounded by OntoGPT's own lookup of HPO labels and synonyms. |
 | ontogpt+belink (fill) | The same OntoGPT extractions. Mentions OntoGPT could not ground are linked by BeLink (SapBERT retrieval + re-ranking); OntoGPT's own HPO ids are kept for the rest. |
-| **ontogpt+belink (rerank-all)** | The same OntoGPT extractions, all linked by BeLink; OntoGPT's own ids are not used. A mention BeLink declines (*None of the above*) is left ungrounded, i.e. BeLink abstains. |
+| **ontogpt+belink (all)** | The same OntoGPT extractions, all linked by BeLink; OntoGPT's own ids are not used. A mention BeLink declines (*None of the above*) is left ungrounded, i.e. BeLink abstains. |
 
 ### Metrics
 
 - **Document level:** whether each HPO concept is present in an observation, regardless of where or how often it is mentioned. This measures concept recognition and normalisation, not boundary detection. There are 604 gold concepts at this level, since a few concepts occur twice in one observation.
 - **Mention level:** each mention with its position in the text. A prediction is a true positive if it has the same HPO id as a gold mention and the same character boundaries (*exact*) or overlapping ones (*overlap*). Each gold mention can be matched only once.
-- **Ungrounded mentions are abstentions.** A mention left without an HPO concept (OntoGPT's lookup failed and, in the BeLink pipelines, BeLink answered *None of the above*) is not counted as a prediction. BeLink is designed to abstain when no candidate fits; the gold concept it missed still counts as a false negative, so recall is unaffected. The baselines output only concepts they matched, so the rule only affects the OntoGPT rows.
+- **Ungrounded mentions are abstentions.** A mention left without an HPO concept (OntoGPT's lookup failed and, in the BeLink pipelines, BeLink answered *None of the above*) is not counted as a prediction. BeLink is designed to abstain when no candidate fits; the gold concept it missed still counts as a false negative, so recall is unaffected. The baselines output only concepts they matched, so the rule only affects the OntoGPT rows. Scores with ungrounded mentions counted as false positives are given [below](#secondary-scoring-ungrounded-mentions-as-false-positives).
 
 ### Results
 
@@ -70,7 +70,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 277 | 123 | 327 | 0.693 | 0.459 | 0.552 |
 | OntoGPT | 323 | **71** | 281 | **0.820** | 0.535 | 0.647 |
 | ontogpt+belink (fill) | 450 | 134 | 154 | 0.771 | 0.745 | 0.758 |
-| **ontogpt+belink (rerank-all)** | **461** | 111 | **143** | 0.806 | **0.763** | **0.784** |
+| **ontogpt+belink (all)** | **461** | 111 | **143** | 0.806 | **0.763** | **0.784** |
 
 **Mention level, overlapping boundaries**
 
@@ -82,7 +82,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 278 | 132 | 329 | 0.678 | 0.458 | 0.547 |
 | OntoGPT | 317 | **80** | 290 | **0.798** | 0.522 | 0.631 |
 | ontogpt+belink (fill) | 442 | 148 | 165 | 0.749 | 0.728 | 0.739 |
-| **ontogpt+belink (rerank-all)** | **453** | 124 | **154** | 0.785 | **0.746** | **0.765** |
+| **ontogpt+belink (all)** | **453** | 124 | **154** | 0.785 | **0.746** | **0.765** |
 
 **Mention level, exact boundaries**
 
@@ -94,7 +94,7 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | NCBO Annotator | 260 | **150** | 347 | **0.634** | 0.428 | 0.511 |
 | OntoGPT | 220 | 177 | 387 | 0.554 | 0.362 | 0.438 |
 | ontogpt+belink (fill) | 299 | 291 | 308 | 0.507 | 0.493 | 0.500 |
-| ontogpt+belink (rerank-all) | 316 | 261 | 291 | 0.548 | 0.521 | 0.534 |
+| ontogpt+belink (all) | 316 | 261 | 291 | 0.548 | 0.521 | 0.534 |
 
 **Effect of grounding with BeLink** (same extracted mentions)
 
@@ -106,6 +106,29 @@ Best values in bold. † FastHPOCR with longest-match output (`longestMatch=True
 | Document-level F1 | 0.647 | 0.758 | 0.784 | +0.110 | +0.137 |
 | Mention-level F1, overlap | 0.631 | 0.739 | 0.765 | +0.107 | +0.134 |
 | Mention-level F1, exact | 0.438 | 0.500 | 0.534 | +0.061 | +0.096 |
+
+**Mentions with an HPO id** is grounding coverage: how many of OntoGPT's extracted mentions ended up with a real HPO concept rather than an `AUTO:` placeholder.
+
+**662** is the number of phenotype mentions the LLM extracted across the 454 observations, i.e. quote-and-term pairs. All three pipelines use exactly these mentions. They differ only in who assigns the HPO ID.
+
+| Column | Count | What it is |
+|---|---|---|
+| OntoGPT | 398 / 662 (60.1%) | OntoGPT's own lookup found an exact HPO label or synonym for 398 terms; the other 264 stayed `AUTO:` |
+| ontogpt+belink (fill) | 595 / 662 (89.9%) | OntoGPT's 398, plus 197 of the 264 that BeLink grounded. BeLink declined the other 67 |
+| ontogpt+belink (all) | 588 / 662 (88.8%) | BeLink re-linked all 662 and declined 74 |
+| Change (fill), Change (all) | +197, +190 | Difference from OntoGPT's 398 |
+
+The 588 in "all" breaks down as:
+- **From OntoGPT's 398:** BeLink gave an ID to 393 and declined 5.
+- **From the 264 OntoGPT couldn't ground:** BeLink grounded 195. That leaves the 69 that neither grounded.
+- **Total:** 393 + 195 = 588.
+
+So "all" grounds 7 fewer mentions than "fill" but still scores better. It's more selective, and it replaced some of OntoGPT's wrong IDs (26 fixed, 6 broken).
+
+Three things to keep in mind:
+- **Coverage, not correctness.** It counts mentions that got some HPO concept, right or wrong. Of BeLink's IDs, 85.7% are right on OntoGPT's grounded mentions and 67.2% on the ones only BeLink grounded.
+- **Counted before scoring filters.** It counts mentions before the branch filter (2 off-branch IDs dropped) and before duplicate concepts within an observation are merged. That's why it doesn't equal TP + FP in the tables.
+- **197 vs 195.** The same 264 ungrounded mentions were sent to BeLink in both runs: 197 got an ID in "fill" and 195 in "all". That gap is slight run-to-run variation in BeLink inference, not a difference in method.
 
 **Ablation: OntoGPT's term in the re-ranker prompt** (ontogpt+belink (all))
 
@@ -137,7 +160,26 @@ Each missed gold concept is assigned to the first step that failed, using BeLink
 | re-ranker chose another option | 57 | no gold mention at that position | 32 |
 | of which one step too general / too specific | 21 / 7 | finding negated in the text / quote not found in the text | 4 / 6 |
 
-A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept one or two steps from a missed gold concept in the same observation as correct (37 pairs) gives a lenient document F1 of 0.847.
+A third of the misses are retrieval misses, which no change to the re-ranker can fix, and the most common re-ranker error is choosing the parent of the gold concept (*Cryptorchidism* for *Bilateral cryptorchidism*). Counting a predicted concept as correct when it is one or two HPO steps from a missed gold concept and its quote overlaps that concept's gold span (37 pairs) gives a lenient document F1 of 0.847.
+
+**Lenient scoring.** A near miss pairs a wrong predicted concept with a missed gold concept in the same observation when one is the ancestor or descendant of the other within two HPO steps and the predicted concept's quote overlaps the missed concept's gold span. Pairs are matched one-to-one, closest first, and each pair counts as a true positive instead of a false positive and a false negative.
+
+| Document level | Quote only (main setting) | Quote (OntoGPT's term) |
+|---|---:|---:|
+| Strict P / R / F1 | 0.806 / 0.763 / 0.784 | 0.796 / 0.775 / 0.785 |
+| Near-miss pairs | 37 | 37 |
+| Lenient P / R / F1 | 0.871 / 0.825 / 0.847 | 0.859 / 0.836 / 0.847 |
+
+#### Secondary scoring: ungrounded mentions as false positives
+
+The same runs, with every ungrounded mention counted as a false positive (as plain OntoGPT output would be used). Baseline rows are unchanged.
+
+| System | Doc TP / FP / FN | Doc P / R / F1 | Mention F1, overlap | Mention F1, exact |
+|---|---:|---:|---:|---:|
+| OntoGPT | 323 / 329 / 281 | 0.495 / 0.535 / 0.514 | 0.502 | 0.348 |
+| ontogpt+belink (fill) | 450 / 196 / 154 | 0.697 / 0.745 / 0.720 | 0.702 | 0.475 |
+| ontogpt+belink (all) | 461 / 180 / 143 | 0.719 / 0.763 / 0.741 | 0.722 | 0.504 |
+| ontogpt+belink (all), quote (OntoGPT's term) | 468 / 181 / 136 | 0.721 / 0.775 / 0.747 | 0.727 | 0.494 |
 
 ### Findings
 
